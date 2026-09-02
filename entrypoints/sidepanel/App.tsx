@@ -727,6 +727,11 @@ export default function App() {
         isPinned={isPinned}
         onTogglePin={togglePin}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onOpenDashboard={() => {
+          if (typeof browser !== 'undefined' && browser.tabs?.create) {
+            browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') });
+          }
+        }}
       />
 
       {/* NAVIGATION TABS */}

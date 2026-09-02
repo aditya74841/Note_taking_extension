@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, Search, X, Filter, Layout, Home, Maximize2, Minimize2, Pin, PinOff, Cloud } from 'lucide-react';
+import { Globe, Search, X, Filter, Layout, Home, Maximize2, Minimize2, Pin, PinOff, Cloud, LayoutDashboard } from 'lucide-react';
 
 const BADGE_PREF_KEY = 'urlnotes_badge_enabled';
 
@@ -24,6 +24,7 @@ interface HeaderProps {
   isPinned?: boolean;
   onTogglePin?: () => void;
   onOpenAuthModal?: () => void;
+  onOpenDashboard?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   isPinned,
   onTogglePin,
   onOpenAuthModal,
+  onOpenDashboard,
 }) => {
   const [badgeEnabled, setBadgeEnabled] = useState(false);
 
@@ -169,6 +171,21 @@ export const Header: React.FC<HeaderProps> = ({
               <Cloud size={13} />
             </button>
           )}
+
+          {/* Open Full Dashboard Page Button */}
+          <button
+            className="icon-btn-ghost dashboard-btn"
+            title="Open Full Cloud Dashboard (Login, Signup & Manager)"
+            onClick={() => {
+              if (onOpenDashboard) {
+                onOpenDashboard();
+              } else if (typeof browser !== 'undefined' && browser.tabs?.create) {
+                browser.tabs.create({ url: browser.runtime.getURL('/dashboard.html') });
+              }
+            }}
+          >
+            <LayoutDashboard size={13} />
+          </button>
 
           {/* Expand / Hide Header Toggle Button */}
           {onToggleCollapseHeader && (
