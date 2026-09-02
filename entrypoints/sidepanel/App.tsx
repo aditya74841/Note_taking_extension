@@ -23,7 +23,7 @@ import { NoteEditor, type SaveStatus } from './components/NoteEditor';
 import { WebsiteNotesView } from './components/WebsiteNotesView';
 import { AllNotesGroupedView } from './components/AllNotesGroupedView';
 import { AuthModal } from './components/AuthModal';
-import { backupNoteToCloud, backupPinToCloud } from '@/lib/sync';
+import { backupNoteToCloud, backupPinToCloud, safeStorage } from '@/lib/sync';
 
 import './App.css';
 
@@ -156,6 +156,13 @@ export default function App() {
   // Load active tab data
   const loadTabContextAndNotes = useCallback(
     async (isInitial = false) => {
+      // Clear any pending auto-save timer from previous tab context
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      isSavePendingRef.current = false;
+
       if (isInitial) setLoading(true);
 
       try {
@@ -344,33 +351,36 @@ export default function App() {
       const domain = context ? context.domain : extractDomain(targetFullUrl) || 'other';
 
       if (isEmpty) {
-        // If content is empty, remove any empty note from IndexedDB
-        await deleteNote(targetKey);
-        setSaveStatus('idle');
-        setLastSavedTime(null);
+        // SAFETY GUARD: Only delete if note existed in DB AND user explicitly cleared text (isSavePendingRef)
+        if (isSavePendingRef.current) {
+          const existingNote = await getNote(targetKey);
+          if (existingNote) {
+            await deleteNote(targetKey);
+            setSaveStatus('idle');
+            setLastSavedTime(null);
 
-        // Backup soft delete to cloud in background
-        backupNoteToCloud({
-          urlKey: targetKey,
-          domain,
-          fullUrl: targetFullUrl,
-          title: '',
-          content: '',
-          isDeleted: true,
-        });
+            // Backup soft delete to cloud in background
+            backupNoteToCloud({
+              urlKey: targetKey,
+              domain,
+              fullUrl: targetFullUrl,
+              title: '',
+              content: '',
+              isDeleted: true,
+            });
 
-        // Safeguard #2: Auto-unpin if the empty note was pinned
-        if (pinnedMapRef.current[domain]?.urlKey === targetKey) {
-          const nextMap = { ...pinnedMapRef.current };
-          delete nextMap[domain];
-          pinnedMapRef.current = nextMap;
-          setPinnedMap(nextMap);
-          setIsPinned(false);
-          isPinnedRef.current = false;
-          if (typeof browser !== 'undefined' && browser.storage?.local) {
-            await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: nextMap }).catch(() => {});
+            // Safeguard #2: Auto-unpin if the empty note was pinned
+            if (pinnedMapRef.current[domain]?.urlKey === targetKey) {
+              const nextMap = { ...pinnedMapRef.current };
+              delete nextMap[domain];
+              pinnedMapRef.current = nextMap;
+              setPinnedMap(nextMap);
+              setIsPinned(false);
+              isPinnedRef.current = false;
+              safeStorage.set({ [PINNED_DOMAINS_KEY]: nextMap }).catch(() => {});
+              backupPinToCloud({ domain, isUnpin: true });
+            }
           }
-          backupPinToCloud({ domain, isUnpin: true });
         }
       } else {
         setSaveStatus('saving');
