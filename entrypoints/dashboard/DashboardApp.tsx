@@ -98,7 +98,7 @@ export default function DashboardApp() {
       setPassword('');
 
       const result = await restoreFromCloud();
-      setSuccessMsg(`Restored ${result.notesCount} notes & ${result.pinsCount} domain pins!`);
+      setSuccessMsg(`Synced & Restored ${result.notesCount} notes & ${result.pinsCount} domain pins!`);
       const notes = await getAllNotes();
       setAllNotes(notes);
     } catch (err: any) {
@@ -114,7 +114,7 @@ export default function DashboardApp() {
     setLoading(true);
     try {
       const result = await restoreFromCloud();
-      setSuccessMsg(`Restored ${result.notesCount} notes & ${result.pinsCount} pins!`);
+      setSuccessMsg(`Synced & Restored ${result.notesCount} notes & ${result.pinsCount} pins!`);
       const notes = await getAllNotes();
       setAllNotes(notes);
     } catch (err: any) {

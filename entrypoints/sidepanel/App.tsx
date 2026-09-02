@@ -224,13 +224,13 @@ export default function App() {
   );
 
   const togglePin = useCallback(async () => {
-    const context = contextRef.current;
+    const context = contextRef.current || currentTab;
     if (!context) return;
 
     const domain = context.domain;
-    const currentTargetKey = editorTargetUrlKeyRef.current;
-    const currentTitle = editorTargetTitleRef.current;
-    const currentFullUrl = editorTargetFullUrlRef.current;
+    const currentTargetKey = editorTargetUrlKeyRef.current || editorTargetUrlKey || context.urlKey;
+    const currentTitle = editorTargetTitleRef.current || editorTargetTitle || context.title;
+    const currentFullUrl = editorTargetFullUrlRef.current || editorTargetFullUrl || context.fullUrl;
 
     if (!domain || !currentTargetKey) return;
 
@@ -266,10 +266,8 @@ export default function App() {
       isUnpin: isCurrentlyPinned,
     });
 
-    if (isCurrentlyPinned) {
-      loadTabContextAndNotes(false);
-    }
-  }, [loadTabContextAndNotes]);
+    await loadTabContextAndNotes(false);
+  }, [currentTab, editorTargetUrlKey, editorTargetTitle, editorTargetFullUrl, loadTabContextAndNotes]);
 
   // Refresh list cards without overwriting active editor content
   const refreshListsOnly = useCallback(async () => {

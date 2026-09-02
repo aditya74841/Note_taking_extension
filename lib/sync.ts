@@ -1,9 +1,10 @@
-import { saveNote, deleteNote } from './db';
+import { saveNote, deleteNote, getAllNotes } from './db';
 
 const AUTH_TOKEN_KEY = 'urlnotes_auth_token';
 const USER_PROFILE_KEY = 'urlnotes_user_profile';
 const SERVER_URL_KEY = 'urlnotes_server_url';
 const DEFAULT_SERVER_URL = 'http://localhost:8000/api/v1';
+const PINNED_DOMAINS_KEY = 'urlnotes_pinned_domains';
 
 export interface UserProfile {
   _id: string;
@@ -90,12 +91,55 @@ export async function logoutApi(): Promise<void> {
   await clearAuthData();
 }
 
-// 📥 One-Time Restore from Cloud into Local IndexedDB
+// 📥 Two-Way Sync: Upload local IndexedDB notes & restore cloud notes
 export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCount: number }> {
   const token = await getAuthToken();
   if (!token) throw new Error('Not authenticated');
 
   const baseUrl = await getServerUrl();
+
+  // STEP 1: Upload all existing local IndexedDB notes to Cloud MongoDB
+  try {
+    const localNotes = await getAllNotes();
+    for (const n of localNotes) {
+      if (n.urlKey && n.content) {
+        await backupNoteToCloud({
+          urlKey: n.urlKey,
+          domain: n.domain || 'other',
+          fullUrl: n.fullUrl || '',
+          title: n.title || '',
+          content: n.content,
+          color: n.color,
+          updatedAt: n.updatedAt,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error uploading local notes before restore:', err);
+  }
+
+  // STEP 2: Upload all existing local domain pins to Cloud MongoDB
+  try {
+    if (typeof browser !== 'undefined' && browser.storage?.local) {
+      const storedPinsRes = await browser.storage.local.get(PINNED_DOMAINS_KEY).catch(() => ({}));
+      const storedPins = ((storedPinsRes || {}) as Record<string, any>)[PINNED_DOMAINS_KEY] || {};
+      for (const [domain, p] of Object.entries(storedPins as Record<string, any>)) {
+        if (p.urlKey) {
+          await backupPinToCloud({
+            domain,
+            urlKey: p.urlKey,
+            title: p.title,
+            fullUrl: p.fullUrl,
+            isUnpin: false,
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error uploading local pins before restore:', err);
+  }
+
+  // STEP 3: Fetch all cloud notes and pins from MongoDB
   const res = await fetch(`${baseUrl}/notes/restore`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -127,7 +171,7 @@ export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCoun
   }
 
   // Restore domain pins into Chrome local storage
-  if (pins.length > 0) {
+  if (pins.length > 0 && typeof browser !== 'undefined' && browser.storage?.local) {
     const pinMap: Record<string, { urlKey: string; title: string; fullUrl: string }> = {};
     for (const p of pins) {
       pinMap[p.domain] = {
@@ -136,10 +180,11 @@ export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCoun
         fullUrl: p.fullUrl,
       };
     }
-    await browser.storage.local.set({ urlnotes_pinned_domains: pinMap });
+    await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: pinMap });
   }
 
-  return { notesCount: notes.length, pinsCount: pins.length };
+  const finalLocalNotes = await getAllNotes();
+  return { notesCount: finalLocalNotes.length, pinsCount: pins.length };
 }
 
 // 📤 Silent Background Note Backup
