@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Globe, Search, X, Filter, Layout, Home, Maximize2, Minimize2, Pin, PinOff } from 'lucide-react';
+import { Globe, Search, X, Filter, Layout, Home, Maximize2, Minimize2, Pin, PinOff, Cloud } from 'lucide-react';
 
 const BADGE_PREF_KEY = 'urlnotes_badge_enabled';
 
@@ -23,6 +23,7 @@ interface HeaderProps {
   onToggleCollapseHeader?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  onOpenAuthModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleCollapseHeader,
   isPinned,
   onTogglePin,
+  onOpenAuthModal,
 }) => {
   const [badgeEnabled, setBadgeEnabled] = useState(false);
 
@@ -156,6 +158,17 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Layout size={13} />
           </button>
+
+          {/* Cloud Sync Auth Button */}
+          {onOpenAuthModal && (
+            <button
+              className="icon-btn-ghost cloud-sync-btn"
+              title="Cloud Backup & One-Time Sync"
+              onClick={onOpenAuthModal}
+            >
+              <Cloud size={13} />
+            </button>
+          )}
 
           {/* Expand / Hide Header Toggle Button */}
           {onToggleCollapseHeader && (

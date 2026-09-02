@@ -22,6 +22,8 @@ import { NavTabs, type ActiveTab } from './components/NavTabs';
 import { NoteEditor, type SaveStatus } from './components/NoteEditor';
 import { WebsiteNotesView } from './components/WebsiteNotesView';
 import { AllNotesGroupedView } from './components/AllNotesGroupedView';
+import { AuthModal } from './components/AuthModal';
+import { backupNoteToCloud, backupPinToCloud } from '@/lib/sync';
 
 import './App.css';
 
@@ -118,6 +120,7 @@ export default function App() {
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavePendingRef = useRef(false);
@@ -255,6 +258,14 @@ export default function App() {
       await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: nextMap }).catch(() => {});
     }
 
+    backupPinToCloud({
+      domain,
+      urlKey: currentTargetKey,
+      title: currentTitle || context.title,
+      fullUrl: currentFullUrl || context.fullUrl,
+      isUnpin: isCurrentlyPinned,
+    });
+
     if (isCurrentlyPinned) {
       loadTabContextAndNotes(false);
     }
@@ -340,6 +351,16 @@ export default function App() {
         setSaveStatus('idle');
         setLastSavedTime(null);
 
+        // Backup soft delete to cloud in background
+        backupNoteToCloud({
+          urlKey: targetKey,
+          domain,
+          fullUrl: targetFullUrl,
+          title: '',
+          content: '',
+          isDeleted: true,
+        });
+
         // Safeguard #2: Auto-unpin if the empty note was pinned
         if (pinnedMapRef.current[domain]?.urlKey === targetKey) {
           const nextMap = { ...pinnedMapRef.current };
@@ -351,6 +372,7 @@ export default function App() {
           if (typeof browser !== 'undefined' && browser.storage?.local) {
             await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: nextMap }).catch(() => {});
           }
+          backupPinToCloud({ domain, isUnpin: true });
         }
       } else {
         setSaveStatus('saving');
@@ -363,6 +385,15 @@ export default function App() {
         });
         setSaveStatus('saved');
         setLastSavedTime(Date.now());
+
+        // Backup note to cloud in background
+        backupNoteToCloud({
+          urlKey: targetKey,
+          domain,
+          fullUrl: targetFullUrl,
+          title: targetTitle || targetFullUrl,
+          content: nextContent,
+        });
 
         // Safeguard #3: Sync title changes to pinnedMap if this note is pinned
         const currentPin = pinnedMapRef.current[domain];
@@ -484,6 +515,16 @@ export default function App() {
       await deleteNote(urlKey);
       const domain = currentTab?.domain || extractDomain(urlKey) || 'other';
 
+      // Backup soft delete to cloud in background
+      backupNoteToCloud({
+        urlKey,
+        domain,
+        fullUrl: '',
+        title: '',
+        content: '',
+        isDeleted: true,
+      });
+
       // Safeguard #1: Auto-unpin domain if the deleted note was the pinned note
       if (pinnedMapRef.current[domain]?.urlKey === urlKey) {
         const nextMap = { ...pinnedMapRef.current };
@@ -495,6 +536,7 @@ export default function App() {
         if (typeof browser !== 'undefined' && browser.storage?.local) {
           await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: nextMap }).catch(() => {});
         }
+        backupPinToCloud({ domain, isUnpin: true });
       }
 
       await refreshNotesLists(domain);
@@ -684,6 +726,7 @@ export default function App() {
         onToggleCollapseHeader={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
         isPinned={isPinned}
         onTogglePin={togglePin}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
       />
 
       {/* NAVIGATION TABS */}
@@ -792,6 +835,16 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* CLOUD AUTH & SYNC MODAL */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onRestoreSuccess={() => {
+          setIsAuthModalOpen(false);
+          refreshNotesLists(currentTab?.domain);
+        }}
+      />
     </div>
   );
 }
