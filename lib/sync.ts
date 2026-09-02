@@ -1,5 +1,7 @@
 import { saveNote, deleteNote, getAllNotes } from './db';
 
+declare const chrome: any;
+
 const AUTH_TOKEN_KEY = 'urlnotes_auth_token';
 const USER_PROFILE_KEY = 'urlnotes_user_profile';
 const SERVER_URL_KEY = 'urlnotes_server_url';
@@ -11,9 +13,79 @@ export interface UserProfile {
   email: string;
 }
 
+// Safe Universal Extension / Browser Storage Helper
+export const safeStorage = {
+  get: async (key: string): Promise<Record<string, any>> => {
+    try {
+      if (typeof browser !== 'undefined' && browser.storage?.local) {
+        return await browser.storage.local.get(key);
+      }
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        return new Promise((resolve) => {
+          chrome.storage.local.get([key], (res: any) => resolve(res || {}));
+        });
+      }
+      const item = localStorage.getItem(key);
+      return item ? { [key]: JSON.parse(item) } : {};
+    } catch {
+      try {
+        const item = localStorage.getItem(key);
+        return item ? { [key]: JSON.parse(item) } : {};
+      } catch {
+        return {};
+      }
+    }
+  },
+  set: async (items: Record<string, any>): Promise<void> => {
+    try {
+      if (typeof browser !== 'undefined' && browser.storage?.local) {
+        await browser.storage.local.set(items);
+        return;
+      }
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        return new Promise((resolve) => {
+          chrome.storage.local.set(items, () => resolve());
+        });
+      }
+      for (const [k, v] of Object.entries(items)) {
+        localStorage.setItem(k, JSON.stringify(v));
+      }
+    } catch {
+      for (const [k, v] of Object.entries(items)) {
+        try {
+          localStorage.setItem(k, JSON.stringify(v));
+        } catch {}
+      }
+    }
+  },
+  remove: async (keys: string | string[]): Promise<void> => {
+    const keyList = Array.isArray(keys) ? keys : [keys];
+    try {
+      if (typeof browser !== 'undefined' && browser.storage?.local) {
+        await browser.storage.local.remove(keyList);
+        return;
+      }
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        return new Promise((resolve) => {
+          chrome.storage.local.remove(keyList, () => resolve());
+        });
+      }
+      for (const k of keyList) {
+        localStorage.removeItem(k);
+      }
+    } catch {
+      for (const k of keyList) {
+        try {
+          localStorage.removeItem(k);
+        } catch {}
+      }
+    }
+  },
+};
+
 export async function getServerUrl(): Promise<string> {
   try {
-    const stored = await browser.storage.local.get(SERVER_URL_KEY);
+    const stored = await safeStorage.get(SERVER_URL_KEY);
     return (stored[SERVER_URL_KEY] as string) || DEFAULT_SERVER_URL;
   } catch {
     return DEFAULT_SERVER_URL;
@@ -21,12 +93,12 @@ export async function getServerUrl(): Promise<string> {
 }
 
 export async function setServerUrl(url: string): Promise<void> {
-  await browser.storage.local.set({ [SERVER_URL_KEY]: url.trim() });
+  await safeStorage.set({ [SERVER_URL_KEY]: url.trim() });
 }
 
 export async function getAuthToken(): Promise<string | null> {
   try {
-    const stored = await browser.storage.local.get(AUTH_TOKEN_KEY);
+    const stored = await safeStorage.get(AUTH_TOKEN_KEY);
     return (stored[AUTH_TOKEN_KEY] as string) || null;
   } catch {
     return null;
@@ -35,7 +107,7 @@ export async function getAuthToken(): Promise<string | null> {
 
 export async function getUserProfile(): Promise<UserProfile | null> {
   try {
-    const stored = await browser.storage.local.get(USER_PROFILE_KEY);
+    const stored = await safeStorage.get(USER_PROFILE_KEY);
     return (stored[USER_PROFILE_KEY] as UserProfile) || null;
   } catch {
     return null;
@@ -43,14 +115,14 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 }
 
 export async function setAuthData(token: string, user: UserProfile): Promise<void> {
-  await browser.storage.local.set({
+  await safeStorage.set({
     [AUTH_TOKEN_KEY]: token,
     [USER_PROFILE_KEY]: user,
   });
 }
 
 export async function clearAuthData(): Promise<void> {
-  await browser.storage.local.remove([AUTH_TOKEN_KEY, USER_PROFILE_KEY]);
+  await safeStorage.remove([AUTH_TOKEN_KEY, USER_PROFILE_KEY]);
 }
 
 export async function registerApi(email: string, password: string): Promise<UserProfile> {
@@ -120,19 +192,17 @@ export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCoun
 
   // STEP 2: Upload all existing local domain pins to Cloud MongoDB
   try {
-    if (typeof browser !== 'undefined' && browser.storage?.local) {
-      const storedPinsRes = await browser.storage.local.get(PINNED_DOMAINS_KEY).catch(() => ({}));
-      const storedPins = ((storedPinsRes || {}) as Record<string, any>)[PINNED_DOMAINS_KEY] || {};
-      for (const [domain, p] of Object.entries(storedPins as Record<string, any>)) {
-        if (p.urlKey) {
-          await backupPinToCloud({
-            domain,
-            urlKey: p.urlKey,
-            title: p.title,
-            fullUrl: p.fullUrl,
-            isUnpin: false,
-          });
-        }
+    const storedPinsRes = await safeStorage.get(PINNED_DOMAINS_KEY).catch(() => ({}));
+    const storedPins = ((storedPinsRes || {}) as Record<string, any>)[PINNED_DOMAINS_KEY] || {};
+    for (const [domain, p] of Object.entries(storedPins as Record<string, any>)) {
+      if (p.urlKey) {
+        await backupPinToCloud({
+          domain,
+          urlKey: p.urlKey,
+          title: p.title,
+          fullUrl: p.fullUrl,
+          isUnpin: false,
+        });
       }
     }
   } catch (err) {
@@ -170,8 +240,8 @@ export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCoun
     }
   }
 
-  // Restore domain pins into Chrome local storage
-  if (pins.length > 0 && typeof browser !== 'undefined' && browser.storage?.local) {
+  // Restore domain pins into local storage
+  if (pins.length > 0) {
     const pinMap: Record<string, { urlKey: string; title: string; fullUrl: string }> = {};
     for (const p of pins) {
       pinMap[p.domain] = {
@@ -180,7 +250,7 @@ export async function restoreFromCloud(): Promise<{ notesCount: number; pinsCoun
         fullUrl: p.fullUrl,
       };
     }
-    await browser.storage.local.set({ [PINNED_DOMAINS_KEY]: pinMap });
+    await safeStorage.set({ [PINNED_DOMAINS_KEY]: pinMap });
   }
 
   const finalLocalNotes = await getAllNotes();
