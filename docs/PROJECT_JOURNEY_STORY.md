@@ -204,6 +204,19 @@ When studying online tutorials or documentation platforms (e.g. LangChain docs, 
 
 ---
 
+## 🧹 Chapter 14: Code Audit & HTML/Multi-Tab Badge Sync Fixes
+
+### The Challenge
+1. **Context Menu Captures (`Ctrl+Q`)**: Appending plain text markdown (`> Selection`) corrupted Quill Editor's HTML structure.
+2. **Drag & Drop**: Dropping text into the editor mixed raw strings with HTML paragraph tags.
+3. **Badge Sync Across Tabs**: Deleting a note from the sidepanel updated the active tab badge, but left badges on other open tabs on that domain out of sync.
+
+### The Solution
+- **Quill HTML Compatibility**: Formatted captured selections as clean `<blockquote>` HTML tags and wrapped dropped text in `<p>` elements.
+- **Broadcast Badge Updates**: Added `updateAllBadges()` in `background.ts` to broadcast badge count refreshes across all open tabs.
+
+---
+
 ## ✅ Current Status: STORE-READY 🚀
 
 The **URL Notes Extension** is fully ready for deployment to the **Chrome Web Store** and **Firefox Add-ons Store**:
