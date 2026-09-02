@@ -1294,6 +1294,17 @@ body {
 }
 
 /* ─── Dashboard Full Page Styles ──────────────────── */
+body.dashboard-body,
+body.dashboard-body #root,
+html:has(.dash-root),
+body:has(.dash-root),
+body:has(.dash-root) #root {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow: auto !important;
+  overflow-y: auto !important;
+}
+
 .dash-root {
   min-height: 100vh;
   background: #06080e;
@@ -1302,7 +1313,7 @@ body {
     radial-gradient(at 80% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
   color: #f1f5f9;
   font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .dash-nav {

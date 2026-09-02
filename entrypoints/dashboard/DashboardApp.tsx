@@ -61,7 +61,11 @@ export default function DashboardApp() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
+    document.body.classList.add('dashboard-body');
     loadData();
+    return () => {
+      document.body.classList.remove('dashboard-body');
+    };
   }, []);
 
   const loadData = async () => {
