@@ -8,7 +8,7 @@ export const restoreUserNotes = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    const notes = await Note.find({ userId, isDeleted: false }).select('-__v');
+    const notes = await Note.find({ userId }).select('-__v');
     const pins = await DomainPin.find({ userId }).select('-__v');
 
     return res.status(200).json(

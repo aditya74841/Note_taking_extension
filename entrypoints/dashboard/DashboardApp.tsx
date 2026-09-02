@@ -40,8 +40,10 @@ import {
   registerApi,
   logoutApi,
   restoreFromCloud,
+  backupNoteToCloud,
   type UserProfile,
 } from '../../lib/sync';
+import { extractDomain } from '../../lib/urlKey';
 
 export default function DashboardApp() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -137,8 +139,22 @@ export default function DashboardApp() {
   };
 
   const handleDeleteNoteItem = async (urlKey: string) => {
-    if (window.confirm('Delete this note from local storage?')) {
+    if (window.confirm('Delete this note from local storage and cloud backup?')) {
+      const noteToDelete = allNotes.find((n) => n.urlKey === urlKey);
+      const domain = noteToDelete?.domain || extractDomain(urlKey) || 'other';
+
       await deleteNote(urlKey);
+
+      // Soft-delete from cloud backup
+      backupNoteToCloud({
+        urlKey,
+        domain,
+        fullUrl: noteToDelete?.fullUrl || '',
+        title: '',
+        content: '',
+        isDeleted: true,
+      });
+
       const notes = await getAllNotes();
       setAllNotes(notes);
     }
