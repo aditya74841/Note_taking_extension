@@ -95,14 +95,16 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/html');
     if (droppedText && droppedText.trim()) {
-      const cleanDropped = droppedText.trim();
-      const current = editorContent || '';
+      const cleanDropped = droppedText.trim().replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const current = (editorContent || '').trim();
 
       let updatedContent = '';
-      if (current.includes('<p>') || current.includes('</div>') || current.includes('</span>')) {
-        updatedContent = current ? `${current}<p>${cleanDropped}</p>` : `<p>${cleanDropped}</p>`;
+      if (!current) {
+        updatedContent = `<p>${cleanDropped}</p>`;
+      } else if (current.includes('<') && current.includes('>')) {
+        updatedContent = `${current}<p>${cleanDropped}</p>`;
       } else {
-        updatedContent = current ? `${current}\n\n${cleanDropped}` : cleanDropped;
+        updatedContent = `<p>${current}</p><p>${cleanDropped}</p>`;
       }
 
       onEditorChange(updatedContent);

@@ -67,13 +67,18 @@ export default defineBackground(() => {
     const quoteText = selectionText.trim();
     if (!quoteText) return;
 
-    const formattedQuote = quoteText.includes('\n')
-      ? quoteText.split('\n').map((line: string) => `> ${line}`).join('\n')
-      : `> ${quoteText}`;
+    const safeQuote = quoteText.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+    const formattedQuote = `<blockquote>${safeQuote}</blockquote>`;
 
-    const newContent = existingNote?.content
-      ? `${existingNote.content}\n\n${formattedQuote}`
-      : formattedQuote;
+    const existingContent = (existingNote?.content || '').trim();
+    let newContent = '';
+    if (!existingContent) {
+      newContent = formattedQuote;
+    } else if (existingContent.includes('<') && existingContent.includes('>')) {
+      newContent = `${existingContent}${formattedQuote}`;
+    } else {
+      newContent = `<p>${existingContent}</p>${formattedQuote}`;
+    }
 
     await saveNote({
       urlKey,
@@ -141,26 +146,40 @@ export default defineBackground(() => {
     }
   });
 
+async function updateAllBadges() {
+  try {
+    const tabs = await browser.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id !== undefined && tab.url) {
+        await updateBadge(tab.id, tab.url);
+      }
+    }
+  } catch (err) {
+    console.error('Error updating all tab badges:', err);
+  }
+}
+
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.type === 'GET_PAGE_NOTE_STATUS') {
       const domain = extractDomain(message.url);
       if (domain) {
         getDomainNoteCount(domain).then((count) => sendResponse({ count }));
-        return true;
+      } else {
+        sendResponse({ count: 0 });
       }
-      sendResponse({ count: 0 });
-      return false;
+      return true;
     }
 
     if (message?.type === 'OPEN_SIDEPANEL') {
       if (sender.tab?.windowId && sidePanel?.open) {
         sidePanel.open({ windowId: sender.tab.windowId }).catch(console.error);
       }
+      sendResponse({ ok: true });
       return false;
     }
 
     if (isNoteSavedMessage(message) || isNoteDeletedMessage(message)) {
-      updateBadgeForTab(message.tabId).then(() => sendResponse({ ok: true }));
+      updateAllBadges().then(() => sendResponse({ ok: true }));
       return true;
     }
     return false;
