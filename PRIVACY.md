@@ -109,3 +109,4 @@ If you have questions, concerns, or requests regarding this Privacy Policy or yo
 
 - **GitHub Issues**: Submit an issue or discussion on this repository.
 - **Developer Email**: [support@example.com] *(Replace with your contact email)*
+
