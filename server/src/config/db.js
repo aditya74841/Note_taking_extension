@@ -27,14 +27,6 @@ function validateProductionDatabaseUri() {
 }
 
 async function verifyIndexes() {
-  for (const model of [RefreshSession, PasswordResetToken]) {
-    const indexes = await model.collection.listIndexes().toArray();
-    const legacyIndex = indexes.find(
-      (candidate) => candidate.name === 'expiresAt_1' && candidate.expireAfterSeconds === undefined,
-    );
-    if (legacyIndex) await model.collection.dropIndex(legacyIndex.name);
-  }
-
   await Promise.all([
     User.init(),
     Note.init(),
@@ -43,12 +35,35 @@ async function verifyIndexes() {
     PasswordResetToken.init(),
   ]);
 
-  for (const { model, name } of requiredUniqueIndexes) {
-    const indexes = await model.collection.listIndexes().toArray();
-    const index = indexes.find((candidate) => candidate.name === name);
+  for (const model of [RefreshSession, PasswordResetToken]) {
+    try {
+      const indexes = await model.collection.listIndexes().toArray();
+      const legacyIndex = indexes.find(
+        (candidate) =>
+          candidate.name === 'expiresAt_1' && candidate.expireAfterSeconds === undefined,
+      );
+      if (legacyIndex) await model.collection.dropIndex(legacyIndex.name);
+    } catch (err) {
+      if (err.code !== 26 && !err.message?.includes('ns does not exist')) {
+        throw err;
+      }
+    }
+  }
 
-    if (!index?.unique) {
-      throw new Error(`Required unique index is missing or not unique: ${model.modelName}.${name}`);
+  for (const { model, name } of requiredUniqueIndexes) {
+    try {
+      const indexes = await model.collection.listIndexes().toArray();
+      const index = indexes.find((candidate) => candidate.name === name);
+
+      if (!index?.unique) {
+        throw new Error(
+          `Required unique index is missing or not unique: ${model.modelName}.${name}`,
+        );
+      }
+    } catch (err) {
+      if (err.code !== 26 && !err.message?.includes('ns does not exist')) {
+        throw err;
+      }
     }
   }
 
