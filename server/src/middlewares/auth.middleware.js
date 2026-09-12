@@ -1,18 +1,20 @@
 import jwt from 'jsonwebtoken';
 import { ApiError } from '../utils/ApiError.js';
 import { User } from '../models/user.model.js';
+import { config } from '../config/env.js';
 
-export const verifyJWT = async (req, _, next) => {
+export const verifyJWT = async (req, _res, next) => {
   try {
-    const token =
-      req.header('Authorization')?.replace('Bearer ', '') ||
-      req.cookies?.accessToken;
+    const authorization = req.header('Authorization');
+    const token = authorization?.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length).trim()
+      : null;
 
     if (!token) {
       throw new ApiError(401, 'Unauthorized request: Missing token');
     }
 
-    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const decodedToken = jwt.verify(token, config.accessTokenSecret);
 
     const user = await User.findById(decodedToken?._id).select('-password');
 
@@ -22,7 +24,7 @@ export const verifyJWT = async (req, _, next) => {
 
     req.user = user;
     next();
-  } catch (error) {
-    next(new ApiError(401, error?.message || 'Invalid or expired token'));
+  } catch {
+    next(new ApiError(401, 'Invalid or expired access token'));
   }
 };

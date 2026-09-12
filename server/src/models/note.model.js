@@ -44,10 +44,14 @@ const noteSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    version: {
+      type: Number,
+      default: 1,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Compound index for fast user + urlKey lookups

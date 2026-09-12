@@ -4,9 +4,17 @@
   "description": "Backend API server for URL Notes Chrome Extension with MongoDB persistence and JWT auth",
   "main": "server.js",
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start:prod": "NODE_ENV=production node server.js",
+    "dev": "nodemon server.js",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "express",
@@ -21,10 +29,22 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.1"
+    "mongoose": "^8.4.1",
+    "pino": "^10.3.1",
+    "sanitize-html": "^2.17.7",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.2"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.12.0",
+    "nodemon": "^3.1.2",
+    "pino-pretty": "^13.1.3",
+    "prettier": "^3.9.6",
+    "supertest": "^7.2.2",
+    "vitest": "^5.0.0"
   }
 }

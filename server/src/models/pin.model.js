@@ -32,7 +32,7 @@ const pinSchema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 pinSchema.index({ userId: 1, domain: 1 }, { unique: true });

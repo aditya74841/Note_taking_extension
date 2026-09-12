@@ -1,31 +1,122 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { config } from './config/env.js';
+import { isDatabaseReady } from './config/db.js';
+import { API_LIMITS, API_VERSION_PREFIX } from './utils/api.constants.js';
+import { ApiResponse } from './utils/ApiResponse.js';
+import { requestLogger } from './middlewares/request-logger.middleware.js';
 import authRouter from './routes/auth.routes.js';
 import noteRouter from './routes/note.routes.js';
-import { errorHandler } from './middlewares/error.middleware.js';
+import { errorHandler, notFoundHandler } from './middlewares/error.middleware.js';
 
-const app = express();
+function createCorsOptions() {
+  const allowAllOrigins = config.corsOrigins.includes('*');
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  })
-);
+  return {
+    origin(origin, callback) {
+      if (!origin || allowAllOrigins || config.corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
 
-app.use(express.json({ limit: '16kb' }));
-app.use(express.urlencoded({ extended: true, limit: '16kb' }));
+      callback(new Error('Origin is not allowed by CORS'));
+    },
+    credentials: false,
+  };
+}
 
-// Health check endpoint
-app.get('/api/v1/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is healthy & running!' });
-});
+export function createApp() {
+  const app = express();
 
-// Routes declaration
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/notes', noteRouter);
+  app.disable('x-powered-by');
+  app.set('trust proxy', config.nodeEnv === 'staging' || config.nodeEnv === 'production');
+  app.use(requestLogger);
+  app.use(helmet());
+  app.use(cors(createCorsOptions()));
 
-// Global Error Handler
-app.use(errorHandler);
+  // Keep request bodies bounded; oversized bodies receive HTTP 413 from Express.
+  app.use(express.json({ limit: API_LIMITS.requestBodyBytes }));
+  app.use(express.urlencoded({ extended: true, limit: API_LIMITS.requestBodyBytes }));
 
-export { app };
+  const sendHealthResponse = (res, statusCode, data, message) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(statusCode).json(new ApiResponse(statusCode, data, message));
+  };
+
+  // Liveness confirms that the Node process is running.
+  app.get(`${API_VERSION_PREFIX}/health/live`, (req, res) => {
+    sendHealthResponse(
+      res,
+      200,
+      {
+        status: 'ok',
+        service: 'url-notes-backend',
+        version: config.appVersion,
+        environment: config.nodeEnv,
+      },
+      'Service is alive',
+    );
+  });
+
+  // Keep the original health route as a backwards-compatible liveness alias.
+  app.get(`${API_VERSION_PREFIX}/health`, (req, res) => {
+    sendHealthResponse(
+      res,
+      200,
+      {
+        status: 'ok',
+        service: 'url-notes-backend',
+        version: config.appVersion,
+        environment: config.nodeEnv,
+      },
+      'Service is alive',
+    );
+  });
+
+  // Readiness confirms that required dependencies are available.
+  app.get(`${API_VERSION_PREFIX}/health/ready`, (req, res) => {
+    const databaseReady = isDatabaseReady();
+
+    if (!databaseReady) {
+      sendHealthResponse(
+        res,
+        503,
+        {
+          status: 'not_ready',
+          service: 'url-notes-backend',
+          version: config.appVersion,
+          environment: config.nodeEnv,
+          database: 'disconnected',
+        },
+        'Service is not ready',
+      );
+      return;
+    }
+
+    sendHealthResponse(
+      res,
+      200,
+      {
+        status: 'ready',
+        service: 'url-notes-backend',
+        version: config.appVersion,
+        environment: config.nodeEnv,
+        database: 'connected',
+      },
+      'Service is ready',
+    );
+  });
+
+  // Routes declaration
+  app.use(`${API_VERSION_PREFIX}/auth`, authRouter);
+  app.use(`${API_VERSION_PREFIX}/notes`, noteRouter);
+
+  // Unknown routes must use the same response contract as other errors.
+  app.use(notFoundHandler);
+
+  // Global Error Handler
+  app.use(errorHandler);
+
+  return app;
+}

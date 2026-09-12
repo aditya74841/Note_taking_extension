@@ -1,32 +1,19 @@
 {
-  "name": "url-notes-extension",
-  "description": "Take notes on every URL you visit",
+  "name": "webmemo-workspace",
+  "description": "WebMemo - Smart URL & Web Notes (Chrome Extension & Cloud API)",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
-    "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
-    "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
-  },
-  "dependencies": {
-    "idb": "^8.0.3",
-    "lucide-react": "^1.39.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-quill-new": "^3.8.3"
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@wxt-dev/module-react": "^1.1.5",
-    "typescript": "^5.9.3",
-    "web-ext": "^10.5.0",
-    "wxt": "^0.21.3"
+    "dev": "npm --prefix extension run dev",
+    "dev:firefox": "npm --prefix extension run dev:firefox",
+    "build": "npm --prefix extension run build",
+    "build:firefox": "npm --prefix extension run build:firefox",
+    "zip": "npm --prefix extension run zip",
+    "compile": "npm --prefix extension run compile",
+    "server:dev": "npm --prefix server run dev",
+    "server:start": "npm --prefix server start",
+    "server:test": "npm --prefix server test",
+    "server:lint": "npm --prefix server run lint",
+    "server:format": "npm --prefix server run format"
   }
 }
+
