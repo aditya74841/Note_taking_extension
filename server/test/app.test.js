@@ -5,6 +5,15 @@ import { createApp } from '../src/app.js';
 const app = createApp();
 
 describe('application foundation', () => {
+  it('returns a successful response on root route /', async () => {
+    const response = await request(app).get('/');
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data.name).toBe('WebMemo API');
+    expect(response.body.data.endpoints).toBeDefined();
+  });
+
   it('returns a successful liveness response', async () => {
     const response = await request(app).get('/api/v1/health/live');
 

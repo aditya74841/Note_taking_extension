@@ -44,6 +44,28 @@ export function createApp() {
     res.status(statusCode).json(new ApiResponse(statusCode, data, message));
   };
 
+  // Main root route — server overview and status
+  app.get('/', (req, res) => {
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        {
+          name: 'WebMemo API',
+          description: 'Backend API server for WebMemo Chrome Extension',
+          version: config.appVersion,
+          environment: config.nodeEnv,
+          database: isDatabaseReady() ? 'connected' : 'disconnected',
+          endpoints: {
+            health: `${API_VERSION_PREFIX}/health/ready`,
+            auth: `${API_VERSION_PREFIX}/auth`,
+            notes: `${API_VERSION_PREFIX}/notes`,
+          },
+        },
+        'WebMemo API Server is running successfully',
+      ),
+    );
+  });
+
   // Liveness confirms that the Node process is running.
   app.get(`${API_VERSION_PREFIX}/health/live`, (req, res) => {
     sendHealthResponse(
